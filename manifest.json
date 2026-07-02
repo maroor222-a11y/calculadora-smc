@@ -1,0 +1,25 @@
+{
+  "name": "SMC Canarias - Calculadora de Despiece",
+  "short_name": "SMC Calc",
+  "description": "Calculadora técnica de despiece de estanterías multi-tramo para SMC Canarias",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
