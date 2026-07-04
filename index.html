@@ -26,7 +26,13 @@
             .tramo-card { break-inside: avoid; border: 1px solid #ddd !important; }
             .bg-slate-50, .bg-slate-900 { background-color: #f3f4f6 !important; color: black !important; -webkit-print-color-adjust: exact; }
             .text-white, .text-blue-400 { color: black !important; }
+            /* Al imprimir: esconde los cuadros de color (pensados para pantalla,
+               se cortan mal entre páginas) y muestra el listado plano en su lugar. */
+            .stat-grid-visual, #totalResults { display: none !important; }
+            .print-only { display: block !important; }
         }
+
+        .print-only { display: none; }
 
         .print-header { display: none; text-align: left; }
     </style>
@@ -101,6 +107,7 @@
                 <div class="card p-8 border border-slate-200 tramo-card">
                     <h2 class="text-xl font-black text-slate-800 uppercase tracking-tighter mb-6 border-b border-slate-100 pb-4">Pedido Total — Lista de Picking <span class="text-slate-400 font-medium text-sm normal-case">(agrupado por medida)</span></h2>
                     <div id="totalResults" class="space-y-5"></div>
+                    <div id="printMaterialsList" class="print-only"></div>
                 </div>
 
             </div>
@@ -476,7 +483,7 @@
                     ${r.gapCm > 0 ? `<p class="text-[10px] font-bold text-orange-600 mb-3">⚠ ${r.gapCm}cm de pared sin cubrir en cada uno de estos tramos.</p>` : ''}
                     ${r.gapCm < 0 ? `<p class="text-[10px] font-bold text-red-600 mb-3">⚠ Has metido ${Math.abs(r.gapCm)}cm de módulos DE MÁS respecto al lineal real (${(t.totalMeters*100).toFixed(0)}cm) en cada uno de estos tramos. Revisa las piezas manuales.</p>` : ''}
                     ${r.panelsUnsolvable ? `<p class="text-[10px] font-bold text-red-600 mb-3">⚠ La altura de poste ${t.postHeight}cm no tiene combinación posible con paneles de 30/20/15cm. Back panels de este tramo NO calculados — corrige la altura.</p>` : ''}
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center stat-grid-visual">
                         <div class="bg-white rounded-xl p-3 border border-slate-100">
                             <span class="block text-[9px] text-slate-400 uppercase font-bold">Módulos (total)</span>
                             <span class="text-lg font-black text-slate-900">${r.modules}</span>
@@ -497,9 +504,34 @@
                             <span class="text-lg font-black text-slate-900">${r.totalArms}</span>
                         </div>
                     </div>
+                    <p class="print-only" style="font-size:11px; line-height:1.6; margin-top:6px;">
+                        Módulos: <strong>${r.modules}</strong> (${r.realLength.toFixed(2)}m) &nbsp;·&nbsp;
+                        Postes ${t.tipo === 'gondola' ? 'Góndola' : 'Pared'}: <strong>${r.posts}</strong> (${t.postHeight}cm, base ${t.shelfDepth}cm) &nbsp;·&nbsp;
+                        Baldas: <strong>${r.totalShelves}</strong> (Fondo ${t.shelfDepth}cm) &nbsp;·&nbsp;
+                        Brazos: <strong>${r.totalArms}</strong>
+                    </p>
                     <p class="text-[9px] text-slate-400 mt-3 italic">Back panels: ${r.b30}×30cm · ${r.b20}×20cm · ${r.b15}×15cm — Zócalos: ${r.zocalos} — Topes: ${r.topes}</p>
                 </div>`;
             }).join('');
+        }
+
+        // Versión imprimible de tableBlock: tabla plana en blanco y negro,
+        // sin cuadros de color (los cuadros están pensados para pantalla y
+        // se cortan mal entre páginas de PDF/impresora).
+        function printBlock(title, rows) {
+            if (rows.length === 0) return '';
+            return `
+            <div style="margin-bottom:14px; break-inside: avoid;">
+                <h4 style="font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid #000; padding-bottom:3px; margin-bottom:2px;">${title}</h4>
+                <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                    ${rows.map(([key, qty]) => `
+                        <tr style="border-bottom:1px solid #ddd;">
+                            <td style="padding:3px 4px 3px 0;">${key}</td>
+                            <td style="padding:3px 0; text-align:right; font-weight:700; width:60px;">${qty}</td>
+                        </tr>
+                    `).join('')}
+                </table>
+            </div>`;
         }
 
         function tableBlock(title, colorClass, rows) {
@@ -531,7 +563,12 @@
 
             tramos.forEach(t => {
                 const r = computeTramo(t);
-                addTo(postesMap, `${t.postHeight}cm`, r.posts);
+                // Vista de montaje: cada línea es "poste + su base", clasificado por
+                // tipo (pared/góndola), altura y tamaño de base. El recuento es de
+                // POSTES, no de bases — un poste de góndola cuenta 1 vez aquí aunque
+                // lleve 2 bases (una a cada cara) al montarlo.
+                const tipoLabel = t.tipo === 'gondola' ? 'Poste Góndola' : 'Poste Pared';
+                addTo(postesMap, `${tipoLabel} · ${t.postHeight}cm · Base ${t.shelfDepth}cm`, r.posts);
                 addTo(brazosMap, `Fondo ${t.shelfDepth}cm`, r.totalArms);
                 r.widthBreakdown.forEach(x => {
                     addTo(baldasMap, `${x.width}×${t.shelfDepth}cm`, x.shelves);
@@ -551,12 +588,14 @@
             document.getElementById('sumModules').innerText = totalModules;
 
             const out = document.getElementById('totalResults');
+            const printList = document.getElementById('printMaterialsList');
             if (tramos.length === 0) {
                 out.innerHTML = '<p class="text-slate-400 text-sm italic">Sin tramos añadidos.</p>';
+                if (printList) printList.innerHTML = '';
                 return;
             }
             out.innerHTML = [
-                tableBlock('Postes Verticales (por altura)', 'border-blue-600', [...postesMap.entries()]),
+                tableBlock('Postes (tipo · altura · base)', 'border-blue-600', [...postesMap.entries()]),
                 tableBlock('Baldas (por medida)', 'border-green-600', [...baldasMap.entries()]),
                 tableBlock('Back Panels (por ancho y altura)', 'border-blue-400', [...panelesMap.entries()]),
                 tableBlock('Brazos de Sujeción (por fondo)', 'border-slate-400', [...brazosMap.entries()]),
@@ -568,6 +607,21 @@
                     <span class="text-xl font-black text-blue-800">${totalPrecios}</span>
                 </div>
             `;
+
+            if (printList) {
+                printList.innerHTML = [
+                    printBlock('Postes (tipo · altura · base)', [...postesMap.entries()]),
+                    printBlock('Baldas (por medida)', [...baldasMap.entries()]),
+                    printBlock('Back Panels (por ancho y altura)', [...panelesMap.entries()]),
+                    printBlock('Brazos de Sujeción (por fondo)', [...brazosMap.entries()]),
+                    printBlock('Zócalos / Plintos (por ancho)', [...zocalosMap.entries()]),
+                    printBlock('Topes Superiores (por ancho)', [...topesMap.entries()]),
+                ].join('') + `
+                    <div style="display:flex; justify-content:space-between; padding-top:8px; border-top:2px solid #000; font-weight:900; font-size:13px;">
+                        <span>PORTAPRECIOS TOTAL</span><span>${totalPrecios}</span>
+                    </div>
+                `;
+            }
         }
 
         function handlePrint() {

@@ -5,7 +5,7 @@
 // IMPORTANTE al actualizar la app: sube el número de CACHE_VERSION cada vez
 // que subas un index.html nuevo al repo. Si no lo subes, los móviles que ya
 // tengan la app instalada seguirán viendo la versión vieja cacheada.
-const CACHE_VERSION = 'smc-calc-v1';
+const CACHE_VERSION = 'smc-calc-v3';
 
 const ASSETS = [
     './',
