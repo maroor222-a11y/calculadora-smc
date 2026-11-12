@@ -24,6 +24,7 @@
   #legend div{display:flex;align-items:center;gap:7px;margin:3px 0}
   #legend i{width:12px;height:12px;border-radius:3px;flex:none;border:1px solid rgba(0,0,0,.15)}
   #legend p{margin:7px 0 0;color:var(--muted);line-height:1.35}
+  #legend #legRows{display:block}
   #help{position:fixed;right:12px;bottom:12px;font-size:12px;color:var(--muted);background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:8px;padding:6px 9px;z-index:5}
   #tip{position:fixed;pointer-events:none;background:var(--navy);color:#fff;font-size:12px;padding:5px 8px;border-radius:6px;display:none;z-index:6;white-space:nowrap}
   @media (max-width:760px){header .t span{display:none}#legend{display:none}#help{display:none}}
@@ -52,12 +53,16 @@
 <div id="help">Arrastra para girar · rueda para zoom · botón derecho para mover</div>
 <div id="tip"></div>
 
-<script type="importmap">
-{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+<script>
+window.addEventListener('error', function(e){
+  var d=document.getElementById('err'); if(!d){d=document.createElement('div');d.id='err';d.style.cssText='position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#fff3f3;color:#8a1c1c;border:1px solid #f0b4b4;border-radius:8px;padding:10px 14px;font:13px system-ui;z-index:20;max-width:90%';document.body.appendChild(d);}
+  d.textContent='No se ha podido dibujar el 3D: '+(e.message||e);
+});
 </script>
-<script type="module">
-import * as THREE from 'three';
-import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+<script>/*THREEJS*/</script>
+<script>
+(function(){
+const THREE = window.THREE, OrbitControls = window.OrbitControls;
 
 const S = /*SCENE*/null;
 const FLOOR = "/*FLOOR*/";
@@ -66,7 +71,9 @@ const CENTER = new THREE.Vector2(S.center[0], S.center[1]);
 const fmt = v => v.toFixed(2).replace('.', ',');
 
 const app = document.getElementById('app');
-const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
+let renderer;
+try { renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true}); }
+catch(e){ throw new Error('este navegador o este ordenador no tiene activados los gráficos 3D (WebGL). Prueba con Chrome o Edge actualizados.'); }
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
@@ -360,6 +367,7 @@ window.__walls = v=>{ walls.visible = v; };
 window.__labels = v=>{ labels.visible = v; };
 window.__cam = cam;
 window.__ready = true;
+})();
 </script>
 </body>
 </html>
