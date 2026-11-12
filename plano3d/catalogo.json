@@ -1,0 +1,17 @@
+{
+  "_nota": "Catálogo de muebles SMC y equipos de frío. Medidas en metros. 'color' = color ACI de la polilínea en el DWG (256 = por capa, 7 = blanco/negro). 'L' y 'D' = rangos de largo y fondo para reconocerla.",
+  "estanteria_pared": {"alto": 2.0, "baldas": [0.12, 0.52, 0.92, 1.32, 1.72], "baldas_sobre_arcon": [1.02, 1.38, 1.74]},
+  "gondola": {"alto": 1.6, "baldas": [0.12, 0.5, 0.88, 1.26], "cabecero_fondo": 0.3},
+  "color_canto": "#1f8a3b",
+  "equipos": [
+    {"nombre": "RVC-2003", "tipo": "vertical", "puertas": 3, "color": [5], "L": [1.8, 2.3], "D": [0.75, 0.95], "alto": 2.065, "info": "Coreco RVC-2003 · 3 puertas · 2,06 × 0,87 × 2,07 m"},
+    {"nombre": "RVC-1002", "tipo": "vertical", "puertas": 2, "color": [5], "L": [1.2, 1.8], "D": [0.75, 0.95], "alto": 2.065, "info": "Coreco RVC-1002 · 2 puertas · 1,37 × 0,87 × 2,07 m"},
+    {"nombre": "Mural CDS1", "tipo": "mural", "color": [4], "L": [1.85, 1.98], "D": [0.7, 0.85], "alto": 2.0, "info": "Mural Coreco CDS1 18 H1 · 1,94 × 0,80 × 2,00 m"},
+    {"nombre": "SMR-170", "tipo": "arcon", "color": [4], "L": [1.6, 1.8], "D": [0.8, 0.95], "alto": 0.81, "info": "Arcón Coreco SMR-170 · 1,70 × 0,87 × 0,81 m"},
+    {"nombre": "SMR-250", "tipo": "arcon", "color": [4], "L": [2.4, 2.6], "D": [0.8, 0.95], "alto": 0.81, "info": "Arcón Coreco SMR-250 · 2,50 × 0,87 × 0,81 m"},
+    {"nombre": "Cámara de frío", "tipo": "camara", "color": [4], "L": [2.5, 8.0], "D": [1.2, 4.0], "alto": 2.0, "info": "Cámara de frío"},
+    {"nombre": "Frutero", "tipo": "frutero", "color": [3], "L": [1.5, 1.7], "D": [0.7, 0.9], "alto": 0.9, "info": "Frutero · 0,80 × 1,60 m"},
+    {"nombre": "Panadería", "tipo": "pan", "color": [2], "L": [0.9, 3.1], "D": [0.35, 0.5], "alto": 2.0, "modulo": 1.0, "texto": "^PAN$", "medida": [1.0, 0.4], "info": "Panadería · 1,00 m · 2,00 m de alto"},
+    {"nombre": "Caja", "tipo": "caja", "color": [7, 256], "L": [2.3, 2.5], "D": [0.85, 0.95], "alto": 1.0, "info": "Mostrador de caja · encimera 0,60 + baldas 0,30"}
+  ]
+}
