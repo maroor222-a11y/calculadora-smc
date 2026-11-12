@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>/*TITULO*/ · Vista 3D · SMC</title>
+<style>
+  :root{--navy:#0F204B;--green:#80BF68;--ink:#1d2433;--muted:#5d6577;--line:#dfe3ea;--bg:#f4f5f7}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg)}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  header{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;gap:14px;padding:10px 16px;background:rgba(255,255,255,.92);border-bottom:1px solid var(--line);backdrop-filter:blur(6px);z-index:5}
+  header svg{height:30px;flex:none}
+  header .t{display:flex;flex-direction:column;line-height:1.2}
+  header .t b{font-size:15px}
+  header .t span{font-size:12px;color:var(--muted)}
+  .bar{margin-left:auto;display:flex;flex-wrap:wrap;gap:6px}
+  button{font:inherit;font-size:13px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:6px 11px;border-radius:7px;cursor:pointer}
+  button:hover{border-color:#b9c0cc}
+  button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+  #legend{position:fixed;left:12px;bottom:12px;background:rgba(255,255,255,.95);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;max-width:300px;z-index:5}
+  #legend h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  #legend div{display:flex;align-items:center;gap:7px;margin:3px 0}
+  #legend i{width:12px;height:12px;border-radius:3px;flex:none;border:1px solid rgba(0,0,0,.15)}
+  #legend p{margin:7px 0 0;color:var(--muted);line-height:1.35}
+  #help{position:fixed;right:12px;bottom:12px;font-size:12px;color:var(--muted);background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:8px;padding:6px 9px;z-index:5}
+  #tip{position:fixed;pointer-events:none;background:var(--navy);color:#fff;font-size:12px;padding:5px 8px;border-radius:6px;display:none;z-index:6;white-space:nowrap}
+  @media (max-width:760px){header .t span{display:none}#legend{display:none}#help{display:none}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<header>
+  <svg viewBox="0 0 120 36" aria-label="SMC">
+    <polygon points="0,1 30,1 30,9.5 6,9.5" fill="#0F204B"/>
+    <polygon points="0,13.5 30,13.5 30,22 6,22" fill="#80BF68"/>
+    <polygon points="0,26 30,26 30,34.5 6,34.5" fill="#0F204B"/>
+    <text x="33" y="32.5" font-family="Poppins,Arial Black,Arial,sans-serif" font-weight="800" font-size="35" fill="#0F204B">SMC</text>
+  </svg>
+  <div class="t"><b>/*TITULO*/ · Vista 3D</b><span>Estanterías SMC y equipos de frío</span></div>
+  <div class="bar">
+    <button id="vGen" class="on">Vista general</button>
+    <button id="vTop">Planta</button>
+    <button id="vEye">A la altura de los ojos</button>
+    <button id="tWalls" class="on">Paredes</button>
+    <button id="tLabels" class="on">Rótulos</button>
+  </div>
+</header>
+<div id="legend"><h4>Leyenda</h4><div id="legRows"></div>
+  <p>Medidas según plano y fichas de los fabricantes. Pasa el ratón por encima de un mueble para ver qué es.</p></div>
+<div id="help">Arrastra para girar · rueda para zoom · botón derecho para mover</div>
+<div id="tip"></div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+const S = /*SCENE*/null;
+const FLOOR = "/*FLOOR*/";
+const [FW, FH] = S.size, ROOM_H = S.room_h;
+const CENTER = new THREE.Vector2(S.center[0], S.center[1]);
+const fmt = v => v.toFixed(2).replace('.', ',');
+
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf4f5f7);
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.05, 400);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI/2 - 0.02;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd0d3d8, 1.6));
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+const R = Math.max(FW, FH);
+sun.position.set(FW*0.2, R*0.9, R*0.45);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-R*0.75,right:R*0.75,top:R*0.75,bottom:-R*0.75,near:1,far:R*3});
+sun.target.position.set(FW/2,0,-FH/2);
+scene.add(sun, sun.target);
+
+const W = (x,y,h=0) => new THREE.Vector3(x, h, -y);   // plano (x, y) -> mundo (x, h, -y)
+
+const tex = new THREE.TextureLoader().load(FLOOR);
+tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(FW, FH), new THREE.MeshStandardMaterial({map:tex, roughness:.95}));
+floor.rotation.x = -Math.PI/2; floor.position.set(FW/2, 0, -FH/2); floor.receiveShadow = true;
+scene.add(floor);
+
+const M = {
+  shelf: new THREE.MeshStandardMaterial({color:0xf3f4f5, metalness:.15, roughness:.55}),
+  back: new THREE.MeshStandardMaterial({color:0xe9ebee, roughness:.7}),
+  lip: new THREE.MeshStandardMaterial({color:new THREE.Color(S.canto), roughness:.5}),
+  post: new THREE.MeshStandardMaterial({color:0xd5d8dc, metalness:.3, roughness:.5}),
+  black: new THREE.MeshStandardMaterial({color:0x26282c, metalness:.3, roughness:.55}),
+  steel: new THREE.MeshStandardMaterial({color:0xc9ced4, metalness:.85, roughness:.3}),
+  frGreen: new THREE.MeshStandardMaterial({color:0x2fa84f, roughness:.5}),
+  tray: new THREE.MeshStandardMaterial({color:0x3fa79a, roughness:.6}),
+  white: new THREE.MeshStandardMaterial({color:0xf7f8fa, roughness:.6}),
+  arcon: new THREE.MeshStandardMaterial({color:0x9aa3ae, roughness:.55}),
+  grey: new THREE.MeshStandardMaterial({color:0x6f7682, roughness:.6}),
+  glass: new THREE.MeshPhysicalMaterial({color:0xbfe3ff, transparent:true, opacity:.35, roughness:.05, metalness:0}),
+  inner: new THREE.MeshStandardMaterial({color:0xdff1ff, emissive:0x9fd3ff, emissiveIntensity:.25, roughness:.7}),
+  wood: new THREE.MeshStandardMaterial({color:0xc9a77c, roughness:.8}),
+  wall: new THREE.MeshStandardMaterial({color:0xeceef1, roughness:.9, transparent:true, opacity:.55}),
+  camara: new THREE.MeshStandardMaterial({color:0xf2f5f8, roughness:.7}),
+};
+
+const walls = new THREE.Group(), labels = new THREE.Group(), pickables = [];
+scene.add(walls, labels);
+
+// Grupo situado en el centro c del plano, girado ang grados: x local = largo, z local = fondo (frente = +z)
+function placed(c, ang, flip=false){
+  const g = new THREE.Group();
+  g.position.copy(W(c[0], c[1]));
+  g.rotation.y = THREE.MathUtils.degToRad(ang) + (flip ? Math.PI : 0);
+  scene.add(g); return g;
+}
+function box(g, w, h, d, x, y, z, mat, shadow=true){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x,y,z); m.castShadow = shadow; m.receiveShadow = true; g.add(m); return m;
+}
+// ¿El frente (+z local) mira hacia el centro del local? Si no, se gira 180°.
+function facesOut(c, ang){
+  const a = THREE.MathUtils.degToRad(ang);
+  const dirPlan = new THREE.Vector2(Math.sin(a), -Math.cos(a));   // +z local en coordenadas del plano
+  return dirPlan.dot(new THREE.Vector2(CENTER.x - c[0], CENTER.y - c[1])) < 0;
+}
+function tag(obj, text){ obj.traverse(o=>{ if(o.isMesh){ o.userData.tag = text; pickables.push(o);} }); }
+function label(text, c, h, size=0.2){
+  const cv = document.createElement('canvas'), ctx = cv.getContext('2d');
+  const fs = 44; ctx.font = `600 ${fs}px system-ui, sans-serif`;
+  cv.width = Math.ceil(ctx.measureText(text).width + 30); cv.height = 64;
+  ctx.font = `600 ${fs}px system-ui, sans-serif`;
+  ctx.fillStyle = 'rgba(15,32,75,.88)'; ctx.beginPath(); ctx.roundRect(0,0,cv.width,cv.height,14); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.textBaseline='middle'; ctx.fillText(text, 15, 34);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:t, depthTest:false}));
+  sp.scale.set(size*cv.width/cv.height, size, 1); sp.position.copy(W(c[0], c[1], h)); sp.renderOrder = 10;
+  labels.add(sp);
+}
+const legend = new Map();
+function leg(color, text, extra=''){ legend.set(text, `<div><i style="background:${color};${extra}"></i>${text}</div>`); }
+
+// ---------- Estantería de pared ----------
+function shelfLevel(g, L, D, y, z0){
+  box(g, L-0.02, 0.025, D, 0, y, z0 + D/2, M.shelf);
+  box(g, L-0.02, 0.05, 0.015, 0, y+0.005, z0 + D + 0.008, M.lip, false);
+}
+function shelving(g, L, D, H, over){
+  const t = 0.03, zb = -D/2 + t;
+  box(g, L, H, t, 0, H/2, -D/2 + t/2, M.back);
+  for(const x of [-L/2+0.02, L/2-0.02]) box(g, 0.04, H, 0.04, x, H/2, -D/2+0.04, M.post);
+  const levels = over ? S.shelf.baldas_sobre_arcon : S.shelf.baldas;
+  for(const y of levels) shelfLevel(g, L, D-t, y, zb);
+  if(!over) box(g, L-0.02, 0.1, 0.02, 0, 0.05, D/2-0.01, M.lip);
+}
+for(const w of S.walls){
+  const g = placed(w.c, w.ang, facesOut(w.c, w.ang));
+  shelving(g, w.L, w.D, w.H, w.over);
+  tag(g, `Estantería de pared ${w.label} · ${fmt(w.H)} m${w.over ? ' · sobre arcón congelador' : ''}`);
+}
+if(S.walls.length) leg('#f3f4f5', `Estantería de pared · ${fmt(S.shelf.alto)} m`, `border-bottom:3px solid ${S.canto}`);
+
+// ---------- Góndolas ----------
+for(const isl of S.islands){
+  const a = THREE.MathUtils.degToRad(isl.ang), u = [Math.cos(a), Math.sin(a)];
+  const D = isl.D, H = isl.H, sp = 0.06;
+  for(const [a0,a1,lab] of isl.segs){
+    const L = a1 - a0, mid = (a0+a1)/2;
+    const g = placed([isl.o[0]+u[0]*mid, isl.o[1]+u[1]*mid], isl.ang);
+    box(g, L, H, sp, 0, H/2, 0, M.back);
+    for(const s of [-1,1]){
+      for(const y of S.gondola.baldas){
+        box(g, L-0.02, 0.025, D-0.02, 0, y, s*(sp/2 + (D-0.02)/2), M.shelf);
+        box(g, L-0.02, 0.05, 0.015, 0, y+0.005, s*(sp/2 + D - 0.01), M.lip, false);
+      }
+      box(g, L-0.02, 0.1, 0.02, 0, 0.05, s*(sp/2 + D - 0.01), M.lip);
+    }
+    for(const x of [-L/2+0.02, L/2-0.02]) box(g, 0.05, H, 0.05, x, H/2, 0, M.post);
+    tag(g, `Góndola de pasillo · módulo ${lab} · ${fmt(H)} m`);
+  }
+}
+for(const cb of S.cabs){
+  const g = placed(cb.c, cb.ang);
+  box(g, cb.W, cb.H, 0.04, 0, cb.H/2, 0, M.back);
+  for(const y of S.gondola.baldas){ box(g, cb.W-0.04, 0.025, cb.L-0.05, 0, y, 0, M.shelf); }
+  tag(g, `Cabecero de góndola · ${fmt(cb.H)} m`);
+}
+if(S.islands.length) leg('#f3f4f5', `Góndola de pasillo · ${fmt(S.gondola.alto)} m`, `border-bottom:3px solid ${S.canto}`);
+
+// ---------- Equipos ----------
+function rvc(g, L, D, H, doors){
+  box(g, L, H, D, 0, H/2, 0, M.white);
+  box(g, L-0.1, H-0.35, 0.02, 0, (H-0.35)/2+0.12, D/2-0.02, M.inner, false);
+  const dw = (L-0.06)/doors;
+  for(let i=0;i<doors;i++){
+    const x = -L/2 + 0.03 + dw*(i+0.5);
+    box(g, dw-0.02, H-0.32, 0.02, x, (H-0.32)/2+0.1, D/2+0.012, M.glass, false);
+    box(g, 0.025, 0.6, 0.03, x + (i%2? -1:1)*(dw/2-0.08), 1.1, D/2+0.04, M.grey);
+  }
+  box(g, L, 0.18, D+0.02, 0, H-0.09, 0.01, M.white);
+  box(g, L, 0.03, 0.01, 0, H-0.2, D/2+0.02, M.grey);
+}
+function mural(g, L, D, H){
+  box(g, L, H, 0.08, 0, H/2, -D/2+0.04, M.white);
+  for(const x of [-L/2+0.03, L/2-0.03]) box(g, 0.06, H, D, x, H/2, 0, M.white);
+  box(g, L, 0.5, D, 0, 0.25, 0, M.white);
+  box(g, L, 0.25, D*0.75, 0, H-0.125, -D*0.125, M.white);
+  for(const y of [0.85,1.15,1.45]) box(g, L-0.1, 0.02, D*0.55, 0, y, -D*0.15, M.inner, false);
+  box(g, L-0.1, 0.02, D-0.15, 0, 0.51, 0.02, M.inner, false);
+}
+function arcon(g, L, D, H){
+  box(g, L, H-0.08, D, 0, (H-0.08)/2, 0, M.arcon);
+  box(g, L+0.01, 0.06, D+0.01, 0, H-0.11, 0, M.grey);
+  box(g, L-0.06, 0.06, D-0.06, 0, H-0.05, 0, M.glass, false);
+  box(g, L-0.14, 0.02, D-0.14, 0, H-0.12, 0, M.inner, false);
+}
+function camara(g, L, D, H){
+  const t=0.08;
+  box(g, L, H, t, 0, H/2, -D/2+t/2, M.camara); box(g, L, H, t, 0, H/2, D/2-t/2, M.camara);
+  box(g, t, H, D, -L/2+t/2, H/2, 0, M.camara); box(g, t, H, D, L/2-t/2, H/2, 0, M.camara);
+  box(g, L, t, D, 0, H-t/2, 0, M.camara);
+  box(g, 0.8, 1.85, 0.03, -L/2+0.7, 0.95, D/2+0.01, M.grey);
+}
+function panaderia(g, L, D, H){
+  const t = 0.03;
+  box(g, L, H, t, 0, H/2, -D/2+t/2, M.black);
+  for(const x of [-L/2+0.02, L/2-0.02]) box(g, 0.04, H, 0.05, x, H/2, -D/2+0.05, M.black);
+  box(g, L-0.02, 0.25, D-0.03, 0, 0.125, t/2, M.black);
+  for(const y of [0.62, 0.92, 1.22]){
+    box(g, L-0.06, 0.12, D-0.06, 0, y, 0.01, M.wood);
+    box(g, L-0.06, 0.24, 0.01, 0, y+0.19, D/2-0.04, M.glass, false);
+    box(g, 0.18, 0.015, 0.02, 0, y, D/2-0.01, M.steel, false);
+  }
+  box(g, L-0.02, 0.03, D-0.03, 0, 1.52, t/2, M.black);
+}
+function caja(g, L, D){   // cuerpo y encimera de 0,60 (cajera, -z) + baldas inclinadas de 0,30 hacia el cliente (+z)
+  const H = 1.0, t = 0.03, top = Math.min(0.60, D-0.2), sh = D - top;
+  const z0 = -D/2, zf = z0 + top;
+  box(g, L, H-0.04, t, 0, (H-0.04)/2, z0+t/2, M.back);
+  box(g, L, H-0.04, t, 0, (H-0.04)/2, zf-t/2, M.back);
+  for(const x of [-L/2+t/2, L/2-t/2]) box(g, t, H-0.04, top, x, (H-0.04)/2, z0+top/2, M.back);
+  box(g, L-0.06, 0.02, top-0.06, 0, 0.45, z0+top/2, M.shelf);
+  box(g, L+0.04, 0.04, top+0.02, 0, H-0.02, z0+top/2, M.shelf);
+  box(g, L+0.04, 0.045, 0.015, 0, H-0.02, zf+0.018, M.lip, false);
+  for(const y of [0.16, 0.46, 0.76]){
+    const gr = new THREE.Group(); gr.position.set(0, y, zf + sh/2); gr.rotation.x = 0.22; g.add(gr);
+    box(gr, L-0.06, 0.02, sh, 0, 0, 0, M.shelf);
+    box(gr, L-0.06, 0.06, 0.015, 0, 0.025, sh/2, M.lip, false);
+  }
+}
+const fruteros = S.equip.filter(e=>e.kind==='frutero');
+function frutero(g, e){
+  const L = e.L, D = e.D, h = 0.72;
+  for(const [x,z] of [[-L/2+0.03,-D/2+0.03],[L/2-0.03,-D/2+0.03],[-L/2+0.03,D/2-0.03],[L/2-0.03,D/2-0.03]]) box(g, 0.05, h, 0.05, x, h/2, z, M.frGreen);
+  for(const z of [-D/2+0.03, D/2-0.03]){ box(g, L-0.1, h-0.16, 0.02, 0, h/2+0.02, z, M.wood); box(g, L, 0.05, 0.05, 0, h-0.03, z, M.frGreen); box(g, L, 0.05, 0.05, 0, 0.1, z, M.frGreen); }
+  for(const x of [-L/2+0.03, L/2-0.03]) box(g, 0.02, h-0.16, D-0.1, x, h/2+0.02, 0, M.wood);
+  // la bandeja sube hacia el frutero vecino (si va en pareja)
+  const other = fruteros.filter(f=>f!==e).sort((a,b)=>Math.hypot(a.c[0]-e.c[0],a.c[1]-e.c[1])-Math.hypot(b.c[0]-e.c[0],b.c[1]-e.c[1]))[0];
+  let tilt = 0.0;
+  if(other && Math.hypot(other.c[0]-e.c[0], other.c[1]-e.c[1]) < D*1.5){
+    const wz = new THREE.Vector3(0,0,1).applyQuaternion(g.quaternion);
+    tilt = ((wz.x*(other.c[0]-e.c[0]) + (-wz.z)*(other.c[1]-e.c[1])) >= 0 ? -1 : 1) * 0.26;
+  }
+  const tray = new THREE.Group(); tray.position.set(0, h+0.12, 0); tray.rotation.x = tilt; g.add(tray);
+  box(tray, L+0.06, 0.04, D+0.04, 0, 0, 0, M.steel);
+  box(tray, L-0.04, 0.012, D-0.08, 0, 0.026, 0, M.tray, false);
+  for(const x of [-L/4, 0, L/4]) box(tray, 0.02, 0.06, D-0.06, x, 0.04, 0, M.steel, false);
+  for(const z of [-D/2, D/2]) box(tray, L+0.06, 0.08, 0.02, 0, 0.04, z, M.steel, false);
+}
+const groupLabel = {};
+for(const e of S.equip){
+  const g = placed(e.c, e.ang, (e.kind==='frutero' || e.kind==='camara') ? false : facesOut(e.c, e.ang));
+  if(e.kind==='vertical') rvc(g, e.L, e.D, e.H, e.doors || 2);
+  else if(e.kind==='mural') mural(g, e.L, e.D, e.H);
+  else if(e.kind==='arcon') arcon(g, e.L, e.D, e.H);
+  else if(e.kind==='camara') camara(g, e.L, e.D, e.H);
+  else if(e.kind==='pan') panaderia(g, e.L, e.D, e.H);
+  else if(e.kind==='caja') caja(g, e.L, e.D);
+  else if(e.kind==='frutero') frutero(g, e);
+  else box(g, e.L, e.H, e.D, 0, e.H/2, 0, M.wood);
+  tag(g, e.kind==='camara' ? `${e.info} · ${fmt(e.L)} × ${fmt(e.D)} × ${fmt(e.H)} m` : e.info);
+  if(e.kind==='pan' || e.kind==='frutero'){ (groupLabel[e.kind] ||= []).push(e); }
+  else label(e.kind==='caja' ? 'Caja' : e.name, e.c, e.H + 0.35);
+}
+for(const [k, es] of Object.entries(groupLabel)){
+  const cx = es.reduce((s,e)=>s+e.c[0],0)/es.length, cy = es.reduce((s,e)=>s+e.c[1],0)/es.length;
+  label(k==='pan' ? 'Panaderías' : 'Fruteros', [cx, cy], k==='pan' ? 2.4 : 1.6);
+}
+// arco verde sobre la pareja de fruteros
+if(fruteros.length >= 2){
+  const [a, b] = fruteros; const mid = [(a.c[0]+b.c[0])/2, (a.c[1]+b.c[1])/2];
+  if(Math.hypot(a.c[0]-b.c[0], a.c[1]-b.c[1]) < a.D*1.5){
+    const g = placed(mid, a.ang);
+    for(const x of [-a.L/2+0.15, a.L/2-0.15]) box(g, 0.035, 0.75, 0.035, x, 1.2, 0, M.frGreen);
+    box(g, a.L-0.3, 0.035, 0.035, 0, 1.57, 0, M.frGreen);
+  }
+}
+const kinds = new Set(S.equip.map(e=>e.kind));
+if(kinds.has('pan')) leg('#26282c', 'Panaderías 1,00 × 2,00 m');
+if(kinds.has('frutero')) leg('#2fa84f', 'Fruteros 0,80 × 1,60 m');
+if(kinds.has('vertical') || kinds.has('mural')) leg('#ffffff', 'Frío vertical (armarios y murales)');
+if(kinds.has('arcon')) leg('#9aa3ae', 'Arcones congeladores');
+if(kinds.has('camara')) leg('#f2f5f8', 'Cámara de frío');
+if(kinds.has('caja')) leg('#f3f4f5', 'Mostrador de caja', `border-bottom:3px solid ${S.canto}`);
+if(S.walls.length){ const w = S.walls.find(w=>!w.over) || S.walls[0]; label(`Estantería pared ${fmt(S.shelf.alto)} m`, w.c, S.shelf.alto + 0.45); }
+if(S.islands.length){ const i = S.islands[0], s = i.segs, m = (s[0][0]+s[s.length-1][1])/2, a = THREE.MathUtils.degToRad(i.ang);
+  label(`Góndolas ${fmt(S.gondola.alto)} m`, [i.o[0]+Math.cos(a)*m, i.o[1]+Math.sin(a)*m], S.gondola.alto + 0.4); }
+document.getElementById('legRows').innerHTML = [...legend.values()].join('');
+
+// ---------- Paredes del local ----------
+for(const [a,b] of S.segs){
+  const dx=b[0]-a[0], dy=b[1]-a[1], len=Math.hypot(dx,dy);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(len, ROOM_H, 0.08), M.wall);
+  m.position.copy(W((a[0]+b[0])/2, (a[1]+b[1])/2, ROOM_H/2));
+  m.rotation.y = Math.atan2(dy, dx);
+  walls.add(m);
+}
+
+// ---------- Vistas ----------
+const V = S.views;
+function cam(p, t){ camera.position.set(...p); controls.target.set(...t); controls.update(); }
+function go(v){
+  cam(V[v].pos, V[v].tgt);
+  for(const [id,k] of [['vGen','gen'],['vTop','top'],['vEye','eye']]) document.getElementById(id).classList.toggle('on', k===v);
+}
+document.getElementById('vGen').onclick = ()=>go('gen');
+document.getElementById('vTop').onclick = ()=>go('top');
+document.getElementById('vEye').onclick = ()=>go('eye');
+const tW = document.getElementById('tWalls'), tL = document.getElementById('tLabels');
+tW.onclick = ()=>{ walls.visible = !walls.visible; tW.classList.toggle('on', walls.visible); };
+tL.onclick = ()=>{ labels.visible = !labels.visible; tL.classList.toggle('on', labels.visible); };
+go('gen');
+
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(), tip = document.getElementById('tip');
+renderer.domElement.addEventListener('pointermove', ev=>{
+  mouse.set(ev.clientX/innerWidth*2-1, -(ev.clientY/innerHeight)*2+1);
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(pickables, false)[0];
+  if(hit){ tip.textContent = hit.object.userData.tag; tip.style.display='block'; tip.style.left=(ev.clientX+14)+'px'; tip.style.top=(ev.clientY+14)+'px'; }
+  else tip.style.display='none';
+});
+addEventListener('resize', ()=>{ camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+renderer.setAnimationLoop(()=>{ controls.update(); renderer.render(scene, camera); });
+// ganchos para las capturas automáticas
+window.__walls = v=>{ walls.visible = v; };
+window.__labels = v=>{ labels.visible = v; };
+window.__cam = cam;
+window.__ready = true;
+</script>
+</body>
+</html>
